@@ -652,9 +652,11 @@ int command_run_line(struct command_context *context, char *line)
 	 * happen when the Jim Tcl interpreter is provided by eCos for
 	 * instance.
 	 */
+	struct target *saved_target_override = context->current_target_override;
 	context->current_target_override = NULL;
 
 	Jim_Interp *interp = context->interp;
+	struct command_context *old_context = Jim_GetAssocData(interp, "context");
 	Jim_DeleteAssocData(interp, "context");
 	retcode = Jim_SetAssocData(interp, "context", NULL, context);
 	if (retcode == JIM_OK) {
@@ -667,7 +669,11 @@ int command_run_line(struct command_context *context, char *line)
 			Jim_DeleteAssocData(interp, "retval");
 		}
 		Jim_DeleteAssocData(interp, "context");
+		int inner_retcode = Jim_SetAssocData(interp, "context", NULL, old_context);
+		if (retcode == JIM_OK)
+			retcode = inner_retcode;
 	}
+	context->current_target_override = saved_target_override;
 	if (retcode == JIM_OK) {
 		const char *result;
 		int reslen;
@@ -1028,12 +1034,6 @@ static int run_usage(Jim_Interp *interp, int argc_valid, int argc, Jim_Obj * con
 static int command_unknown(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 {
 	const char *cmd_name = Jim_GetString(argv[0], NULL);
-	if (strcmp(cmd_name, "unknown") == 0) {
-		if (argc == 1)
-			return JIM_OK;
-		argc--;
-		argv++;
-	}
 	script_debug(interp, cmd_name, argc, argv);
 
 	struct command_context *cmd_ctx = current_command_context(interp);
