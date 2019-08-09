@@ -70,6 +70,7 @@
 #include "config.h"
 #endif
 
+#include <unistd.h>
 #include "jtag/interface.h"
 #include "arm.h"
 #include "arm_adi_v5.h"
@@ -232,12 +233,16 @@ int mem_ap_read_u32(struct adiv5_ap *ap, uint32_t address,
 	retval = mem_ap_setup_transfer(ap,
 			CSW_32BIT | (ap->csw_value & CSW_ADDRINC_MASK),
 			address & 0xFFFFFFF0);
-	if (retval != ERROR_OK)
+	if (retval != ERROR_OK){
+		LOG_DEBUG("#####: Error setting up transfer value\n");
 		return retval;
+	}
 
 	return dap_queue_ap_read(ap, MEM_AP_REG_BD0 | (address & 0xC), value);
 }
 
+
+#define MAX_WAIT_RETRIES 8
 /**
  * Synchronous read of a word from memory or a system register.
  * As a side effect, this flushes any queued transactions.
@@ -254,12 +259,38 @@ int mem_ap_read_atomic_u32(struct adiv5_ap *ap, uint32_t address,
 		uint32_t *value)
 {
 	int retval;
+	int retries = 0;
 
-	retval = mem_ap_read_u32(ap, address, value);
-	if (retval != ERROR_OK)
+	/* Flush things out so that we are just retrying this operation if
+	   necessary */
+	retval = dap_run(ap->dap);
+	if (retval != ERROR_OK){
+		LOG_DEBUG("#####: Error performing initial dap_run.\n");
 		return retval;
+	}
 
-	return dap_run(ap->dap);
+	do
+	{
+		retval = mem_ap_read_u32(ap, address, value);
+		if (retval != ERROR_OK){
+			LOG_DEBUG("#####: Error queuing reading value\n");
+			return retval;
+		}
+		
+		retval = dap_run(ap->dap);
+
+		if (retval == ERROR_WAIT && retries < MAX_WAIT_RETRIES) {
+			useconds_t delay_us = (1<<retries++) * 1000;
+			LOG_DEBUG("ERROR_WAIT, retry %d, delaying %u microseconds", retries, delay_us);
+			usleep(delay_us);
+		}else if (retval != ERROR_OK)
+		{
+			LOG_DEBUG("#####: Error performing initial dap_run other than wait error\n");
+			return retval;
+		}
+	}while(retval != ERROR_OK);
+
+	return retval;
 }
 
 /**

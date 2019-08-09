@@ -1078,6 +1078,7 @@ static int ftdi_swd_run_queue(void)
 	struct signal *led = find_signal_by_name("LED");
 
 	if (queued_retval != ERROR_OK) {
+		LOG_DEBUG(">>>>>>>: ftdi_swd_run_queue skip path.\n");
 		LOG_DEBUG_IO("Skipping due to previous errors: %d", queued_retval);
 		goto skip;
 	}
@@ -1093,6 +1094,7 @@ static int ftdi_swd_run_queue(void)
 	queued_retval = mpsse_flush(mpsse_ctx);
 	if (queued_retval != ERROR_OK) {
 		LOG_ERROR("MPSSE failed");
+		LOG_DEBUG(">>>>>>>: MPSSE failed flush.\n");
 		goto skip;
 	}
 
@@ -1109,6 +1111,7 @@ static int ftdi_swd_run_queue(void)
 
 		if (ack != SWD_ACK_OK) {
 			queued_retval = ack == SWD_ACK_WAIT ? ERROR_WAIT : ERROR_FAIL;
+			LOG_DEBUG(">>>>>>>: !SWD_ACK_OK \n");
 			goto skip;
 
 		} else if (swd_cmd_queue[i].cmd & SWD_CMD_RnW) {
@@ -1117,6 +1120,7 @@ static int ftdi_swd_run_queue(void)
 
 			if (parity != parity_u32(data)) {
 				LOG_ERROR("SWD Read data parity mismatch");
+				LOG_DEBUG(">>>>>>>: parity.\n");
 				queued_retval = ERROR_FAIL;
 				goto skip;
 			}

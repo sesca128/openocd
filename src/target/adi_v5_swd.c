@@ -86,8 +86,16 @@ static int swd_run_inner(struct adiv5_dap *dap)
 	retval = swd->run();
 
 	if (retval != ERROR_OK) {
-		/* fault response */
-		dap->do_reconnect = true;
+		LOG_DEBUG("#####: Error performing swd->run().\n");
+
+		if (retval != ERROR_WAIT)
+		{
+			/* fault response */
+			dap->do_reconnect = true;
+		}else{
+			swd_clear_sticky_errors(dap);
+			swd_run_inner(dap);
+		}
 	}
 
 	return retval;
