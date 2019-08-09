@@ -232,8 +232,10 @@ int mem_ap_read_u32(struct adiv5_ap *ap, uint32_t address,
 	retval = mem_ap_setup_transfer(ap,
 			CSW_32BIT | (ap->csw_value & CSW_ADDRINC_MASK),
 			address & 0xFFFFFFF0);
-	if (retval != ERROR_OK)
+	if (retval != ERROR_OK){
+		LOG_DEBUG("#####: Error setting up transfer value\n");
 		return retval;
+	}
 
 	return dap_queue_ap_read(ap, MEM_AP_REG_BD0 | (address & 0xC), value);
 }
